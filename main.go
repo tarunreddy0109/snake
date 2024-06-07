@@ -1,9 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	"log"
+	"os"
 	"time"
+
+	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -45,6 +49,8 @@ type Game struct {
 	grid   [unitsX][unitsY]int
 	player *Snake
 	time   int
+	food   Vec2D
+	score  int
 }
 
 type GameObject interface {
@@ -94,6 +100,29 @@ func (g *Game) Update() error {
 		case down:
 			g.player.head.y++
 		}
+
+		// detecting collisions with wall and body
+		if g.player.head.x < 0 || g.player.head.x >= unitsX || g.player.head.y < 0 || g.player.head.y >= unitsY {
+			// TODO: gracefully handle game over
+			fmt.Printf("game over")
+			// exit game
+			os.Exit(0)
+		}
+		for _, e := range g.player.body {
+			if g.player.head.x == e.x && g.player.head.y == e.y {
+				// TODO: gracefully handle game over
+				fmt.Printf("game over")
+				os.Exit(0)
+			}
+		}
+
+		// detecting collision with food
+		if g.player.head.x == g.food.x && g.player.head.y == g.food.y {
+			g.player.body = append(g.player.body, Vec2D{g.player.body[len(g.player.body)-1].x, g.player.body[len(g.player.body)-1].y})
+			g.food = spawnfood(g)
+			g.score = g.score + 1
+			fmt.Println("score: ", g.score)
+		}
 	}
 
 	g.time = int(time.Now().Unix())
@@ -121,6 +150,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			float32(blockLength),
 			color.White, true)
 	}
+
+	// drawing the food
+	vector.DrawFilledRect(screen, float32(g.food.x)*float32(blockLength), float32(g.food.y)*float32(blockLength), float32(blockLength), float32(blockLength), color.RGBA{255, 0, 0, 0}, true)
 }
 
 func (g *Game) Layout(_, _ int) (int, int) {
@@ -139,7 +171,23 @@ func newGame() *Game {
 		player: &Snake{head: head, body: body, d: right},
 	}
 
+	food := spawnfood(game)
+	game.food = food
+	game.score = 0
 	return game
+}
+
+// spawn food
+func spawnfood(game *Game) Vec2D {
+	food := Vec2D{}
+
+	for {
+		food = Vec2D{rand.Intn(unitsX), rand.Intn(unitsY)}
+		if game.grid[food.x][food.y] == 0 {
+			game.grid[food.x][food.y] = 1
+			return food
+		}
+	}
 }
 
 func main() {
